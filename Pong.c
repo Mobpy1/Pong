@@ -3,86 +3,95 @@
 #include <SDL2/SDL.h>
 #include <stdio.h>
 
+#define WHITE 0xffffffff   // Color White
+#define BLACK 0x00000000   // Color Black
+#define PINK 0xfc028b      // Color Pink
+#define GREEN 0x1fe04c     // Color Green
+#define TURQUOISE 0x05ffff // Color Turquoise
 
-#define WHITE 0xffffffff // Color White
-#define BLACK 0x00000000 // Color Black
-
-
-
-static int PlayerSpeed = 20;
+static int PLAYER_SPEED = 20;
+int Gameover = 0;
 
 struct BallSpeed
 {
     int x;
-    int y;    
-} BallSpeed;
+    int y;
+} BallSpeed = {2, 2};
 
-SDL_Rect ball = (SDL_Rect){150, 230, 10, 10}; // Initialize Ball 
 
-void spawn_ball(SDL_Surface* surface)
+// Initialize Ball
+SDL_Rect ball = (SDL_Rect){150, 230, 10, 10}; 
+
+//Initialize Players
+SDL_Rect player_1 = (SDL_Rect){40, 40, 40, 200};
+SDL_Rect player_2 = (SDL_Rect){550, 40, 40, 200};
+
+void spawn_ball(SDL_Surface *surface)
 {
-    SDL_FillRect(surface, &ball, WHITE);  //Draw Ball
-    BallSpeed = (struct BallSpeed){1,1}; //Initialize Ball Speed
+    SDL_FillRect(surface, &ball, PINK); // Draw Ball
 }
 
-void move_ball(SDL_Surface* surface , SDL_Rect* ball , struct BallSpeed)
+void move_ball_AND_collisions(SDL_Surface *surface, SDL_Rect *ball, SDL_Rect *player_1, SDL_Rect *player_2, struct BallSpeed *speed)
 {
-    SDL_FillRect(surface,ball,BLACK);
-    ball->x += BallSpeed.x ;
-    SDL_FillRect(surface,ball,WHITE);
-}
+    SDL_FillRect(surface, ball, BLACK); // Clear previous ball position
 
+    ball->x += speed->x;
+    ball->y += speed->y;
 
-void move_player_1(SDL_Surface* surface , SDL_Rect* rect, int movement, char direction) 
-{   
-    SDL_FillRect(surface, rect, BLACK);
-    if(direction == '-' && rect->y >=20)
+    // END OF THE GAME
+    if (ball->x <= 0 || ball->x + ball->w >= surface->w) // Left or Right Edge
     {
-        rect->y -= movement;
+        Gameover = 1;
     }
-    else if (direction == '+' && rect->y + rect->h <= surface->h - 20)
+
+    // Normal Collision Check With Wall
+    if (ball->y <= 0 || ball->y + ball->h >= surface->h) // Top or Bottom Edge
     {
-       rect->y += movement;  
+        speed->y = -speed->y; // Reverse Vertical Direction
+    }
+
+    // Collision Check With Players
+    if (SDL_HasIntersection(ball, player_1) || SDL_HasIntersection(ball, player_2))
+    {
+        speed->x = -speed->x;
+    }
+
+    SDL_FillRect(surface, ball, PINK); // Redraw ball
+}
+
+void move_player(SDL_Surface *surface, SDL_Rect *player, int movement, char direction)
+{
+    SDL_FillRect(surface, player, BLACK); // Clear previous player position
+
+    
+    if (direction == '-' && player->y >= 20)
+    {
+        player->y -= movement; // Move up
+    }
+    else if (direction == '+' && player->y + player->h <= surface->h - 20)
+    {
+        player->y += movement; // Move down
     }
     
-    SDL_FillRect(surface, rect, WHITE);
-    printf("PLAYER 1(Y) =  %d\n", rect->y);
-        
-}   
-
-void move_player_2(SDL_Surface *surface, SDL_Rect *rect, int movement, char direction)
-{
-    if (direction == '-')
+    
+    if (player == &player_1)
     {
-        if (rect->y >= 20)
-        {
-            SDL_FillRect(surface, rect, BLACK);
-            rect->y -= movement;
-            SDL_FillRect(surface, rect, WHITE);
-            printf("PLAYER 1(Y) =  %d\n", rect->y);
-        }
+        SDL_FillRect(surface, player, GREEN); // Green for player 1
     }
-    else if (direction == '+')
+    else if (player == &player_2)
     {
-        if (rect->y <= 260)
-        {
-            SDL_FillRect(surface, rect, BLACK);
-            rect->y += movement;
-            SDL_FillRect(surface, rect, WHITE);
-
-            printf("PLAYER 2(Y) = %d\n", rect->y);
-        }
+        SDL_FillRect(surface, player, TURQUOISE); // Turquoise for player 2
     }
+
+    printf("(Y) =  %d\n", player->y); // Debugging output for player Y position
 }
-
-
 
 int main()
 {
     SDL_InitSubSystem(SDL_INIT_VIDEO);
 
     SDL_Window *window = SDL_CreateWindow("I Love Julija", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, 0);
-    
+
     if (window == NULL)
     {
         printf("SDL_CreateWindow Error: %s\n", SDL_GetError());
@@ -92,67 +101,75 @@ int main()
 
     SDL_Surface *surface = SDL_GetWindowSurface(window);
 
-    //Creating Players
-    SDL_Rect player_1 = (SDL_Rect){40,40,40,200};
-    SDL_Rect player_2 = (SDL_Rect){550,40,40,200}; 
     
-
-    // Spawning Players
-    SDL_FillRect(surface, &player_1, WHITE);
-    SDL_FillRect(surface, &player_2 ,WHITE);
-
+    
+    // Spawning Players (Initial drawing)
+    SDL_FillRect(surface, &player_1, GREEN);     // Green for player 1
+    SDL_FillRect(surface, &player_2, TURQUOISE); // Turquoise for player 2
 
     SDL_Event event;
-    
-    int quit = 0;
-    int ballspawned = 0;
 
+    int ball_spawned = 0;
 
-    while (!quit)
+    while (!Gameover)
     {
-        
-        SDL_PollEvent(&event);
-
-        if(!ballspawned) //Spawn Ball By Pressing Space
+        while (SDL_PollEvent(&event))
         {
-            if (event.key.keysym.sym == SDLK_SPACE){
-                spawn_ball(surface);
-                ballspawned = 1;
+            if (event.type == SDL_QUIT)
+            {
+                Gameover = 1;
+            }
+            // KEYDOWN to prevent double inputs
+            else if (event.type == SDL_KEYDOWN)
+            {
+                switch (event.key.keysym.sym)
+                {
+                // SPACE SPAWNS BALL
+                case SDLK_SPACE:
+                    if (!ball_spawned)
+                    {
+                        spawn_ball(surface);
+                        ball_spawned = 1;
+                    }
+                    break;
+
+                // MOVEMENT KEYS
+                case SDLK_w:
+                    move_player(surface, &player_1, PLAYER_SPEED, '-');
+                    break;
+                case SDLK_s:
+                    move_player(surface, &player_1, PLAYER_SPEED, '+');
+                    break;
+                case SDLK_UP:
+                    move_player(surface, &player_2, PLAYER_SPEED, '-');
+                    break;
+                case SDLK_DOWN:
+                    move_player(surface, &player_2, PLAYER_SPEED, '+');
+                    break;
+                case SDLK_x:
+                    Gameover = 1;
+                    break;
+
+                default:
+                    break;
+                }
             }
         }
 
-        if (event.type == SDL_QUIT || event.key.keysym.sym == SDLK_x) // Window Close Button OR x is Clicked
+        // Move the ball if spawned
+        if (ball_spawned)
         {
-            printf("Quitting: Key Pressed");
-            quit = 1;
+            move_ball_AND_collisions(surface, &ball, &player_1, &player_2, &BallSpeed);
         }
         
-        switch (event.key.keysym.sym)
-        {
-        case SDLK_w:
-            move_player_1(surface, &player_1, PlayerSpeed,'-');
-            break;
-        case SDLK_s:
-            move_player_1(surface, &player_1, PlayerSpeed,'+');
-            break;
-        case SDLK_UP:
-            move_player_2(surface, &player_2, PlayerSpeed,'-');
-            break;
-        case SDLK_DOWN:
-            move_player_2(surface, &player_2, PlayerSpeed,'+');
-            break;
+        SDL_FillRect(surface,&player_1,GREEN);
+        SDL_FillRect(surface,&player_2,TURQUOISE);
 
-        default:
-            break;
-        }
-
-        move_ball(surface, &ball, BallSpeed);
-        //Move Ball
-
-
-        SDL_Delay(10);
-        SDL_UpdateWindowSurface(window);
+        SDL_UpdateWindowSurface(window); // Update the window
+        SDL_Delay(10);                   // Control frame rate
     }
+
+    printf("Game Over. Well Done!");
     SDL_DestroyWindow(window);
     SDL_Quit();
 
