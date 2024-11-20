@@ -11,6 +11,8 @@
 
 static int PLAYER_SPEED = 20;
 int Gameover = 0;
+int Running = 1;
+
 
 struct BallSpeed
 {
@@ -86,6 +88,22 @@ void move_player(SDL_Surface *surface, SDL_Rect *player, int movement, char dire
     printf("(Y) =  %d\n", player->y); // Debugging output for player Y position
 }
 
+void reset_game()
+{
+    // Reset players' positions
+    player_1 = (SDL_Rect){40, 40, 40, 200};
+    player_2 = (SDL_Rect){550, 40, 40, 200};
+
+    // Reset the ball position
+    ball = (SDL_Rect){150, 230, 10, 10};
+
+    // Reset the ball speed
+    BallSpeed = (struct BallSpeed){2, 2};
+
+    // Reset game state
+    Gameover = 0;
+}
+
 int main()
 {
     SDL_InitSubSystem(SDL_INIT_VIDEO);
@@ -100,8 +118,6 @@ int main()
     }
 
     SDL_Surface *surface = SDL_GetWindowSurface(window);
-
-    
     
     // Spawning Players (Initial drawing)
     SDL_FillRect(surface, &player_1, GREEN);     // Green for player 1
@@ -110,14 +126,15 @@ int main()
     SDL_Event event;
 
     int ball_spawned = 0;
-
-    while (!Gameover)
+    int game_over_displayed = 0;
+ 
+    while (Running)
     {
         while (SDL_PollEvent(&event))
         {
-            if (event.type == SDL_QUIT)
+            if (event.type == SDL_QUIT || event.key.keysym.sym == SDLK_x)
             {
-                Gameover = 1;
+                Running = 0;
             }
             // KEYDOWN to prevent double inputs
             else if (event.type == SDL_KEYDOWN)
@@ -126,7 +143,13 @@ int main()
                 {
                 // SPACE SPAWNS BALL
                 case SDLK_SPACE:
-                    if (!ball_spawned)
+                    if(Gameover)
+                    {
+                        reset_game();
+                        ball_spawned = 0;
+                        game_over_displayed = 0;
+                    }
+                    else if (!ball_spawned)
                     {
                         spawn_ball(surface);
                         ball_spawned = 1;
@@ -146,9 +169,6 @@ int main()
                 case SDLK_DOWN:
                     move_player(surface, &player_2, PLAYER_SPEED, '+');
                     break;
-                case SDLK_x:
-                    Gameover = 1;
-                    break;
 
                 default:
                     break;
@@ -156,20 +176,45 @@ int main()
             }
         }
 
-        // Move the ball if spawned
-        if (ball_spawned)
+
+
+        if(Gameover)
         {
+            if(!game_over_displayed)
+            { 
+            printf("Game Over. Press Space To Restart!\n Or Press X to Exit\n");
+            
+            SDL_FillRect(surface, &player_1, BLACK);
+            SDL_FillRect(surface, &player_2, BLACK);
+            SDL_FillRect(surface, &ball    , BLACK);
+            
+            game_over_displayed =1;
+            }
+        }  
+        else
+        {           
+            if (ball_spawned)
+            {
+            // Move the ball if spawned
             move_ball_AND_collisions(surface, &ball, &player_1, &player_2, &BallSpeed);
+            }
+                
+            SDL_FillRect(surface,&player_1,GREEN);
+            SDL_FillRect(surface,&player_2,TURQUOISE);
+
+            SDL_UpdateWindowSurface(window); // Update the window
         }
         
-        SDL_FillRect(surface,&player_1,GREEN);
-        SDL_FillRect(surface,&player_2,TURQUOISE);
-
-        SDL_UpdateWindowSurface(window); // Update the window
+        
+        
         SDL_Delay(10);                   // Control frame rate
+    
     }
 
-    printf("Game Over. Well Done!");
+
+
+    printf("\nGame Over. Well Done!");
+    SDL_Delay(2000);
     SDL_DestroyWindow(window);
     SDL_Quit();
 
